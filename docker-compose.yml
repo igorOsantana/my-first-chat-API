@@ -11,7 +11,7 @@ networks:
 
 services:
   db:
-    container_name: db-utfpr-distributed-systems-chat-api
+    container_name: my-first-chat-API-db
     image: postgres
     restart: always
     networks:
@@ -25,7 +25,7 @@ services:
     ports:
       - 5432:5432
   api:
-    container_name: api-utfpr-distributed-systems-chat
+    container_name: my-first-chat-API
     build:
       context: .
     restart: always
