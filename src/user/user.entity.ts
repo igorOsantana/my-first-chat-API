@@ -5,4 +5,8 @@ export class UserEntity {
   password: string;
   createdAt: Date;
   updatedAt: Date;
+
+  constructor(user: UserEntity) {
+    Object.assign(this, user);
+  }
 }
