@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Inject,
   Param,
   Patch,
   Post,
@@ -18,12 +19,24 @@ import {
 } from './chat.doc';
 import { CreateChatDto, FindAllChatDto } from './chat.dto';
 import { ChatListPresenter, ChatPresenter } from './chat.presenter';
-import { ChatUseCases } from './chat.usecase';
+import {
+  CHAT_USECASES,
+  TCreateChatUseCase,
+  TFindAllChatUseCase,
+  TMarkAsReadChatUseCase,
+} from './interfaces/use-case.interface';
 
 @Controller('chats')
 @ChatControllersDoc()
 export class ChatControllers {
-  constructor(private readonly chatUseCases: ChatUseCases) {}
+  constructor(
+    @Inject(CHAT_USECASES.CREATE)
+    private readonly createChatUseCase: TCreateChatUseCase,
+    @Inject(CHAT_USECASES.FIND_ALL)
+    private readonly findAllChatUseCase: TFindAllChatUseCase,
+    @Inject(CHAT_USECASES.MARK_AS_READ)
+    private readonly markAsReadChatUseCase: TMarkAsReadChatUseCase,
+  ) {}
 
   @Post()
   @CreateResponseDoc()
@@ -36,18 +49,20 @@ export class ChatControllers {
       recipientId: dto.recipientId,
       senderId: reqUser.id,
     };
-    const chat = await this.chatUseCases.create(params);
+    const chat = await this.createChatUseCase.execute(params);
     return new ChatPresenter(chat, reqUser.id);
   }
 
   @Get()
-  @HttpCode(HttpStatus.OK)
   @FindAllResponseDoc()
   async findAll(
     @RequestUser() reqUser: TRequestUser,
     @Query() dto: FindAllChatDto,
   ) {
-    const chats = await this.chatUseCases.findAll(reqUser.id, dto);
+    const chats = await this.findAllChatUseCase.execute({
+      userId: reqUser.id,
+      ...dto,
+    });
     return new ChatListPresenter(chats, reqUser.id);
   }
 
@@ -58,6 +73,9 @@ export class ChatControllers {
     @Param('id') id: string,
     @RequestUser() reqUser: TRequestUser,
   ) {
-    await this.chatUseCases.markAsRead(id, reqUser.id);
+    await this.markAsReadChatUseCase.execute({
+      id,
+      userId: reqUser.id,
+    });
   }
 }

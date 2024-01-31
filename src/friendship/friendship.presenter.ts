@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { TPaginationOutput } from 'src/shared/interface.shared';
 import { UserPresenter } from 'src/user/user.presenter';
 import { FriendshipEntity, FriendshipStatus } from './friendship.entity';
 
@@ -27,8 +28,8 @@ export class MyFriendsFriendshipPresenter {
   @ApiProperty({ isArray: true, type: UserPresenter })
   friends: UserPresenter[];
 
-  constructor(userId: string, friendships: FriendshipEntity[]) {
-    this.friends = friendships.map((friendship) =>
+  constructor(userId: string, response: TPaginationOutput<FriendshipEntity>) {
+    this.friends = response.list.map((friendship) =>
       friendship.sender.id === userId
         ? friendship.recipient
         : friendship.sender,
@@ -40,7 +41,7 @@ export class RequestsFriendshipPresenter {
   @ApiProperty({ isArray: true, type: UserPresenter })
   requests: UserPresenter[];
 
-  constructor(friendships: FriendshipEntity[]) {
-    this.requests = friendships.map((friendship) => friendship.sender);
+  constructor(response: TPaginationOutput<FriendshipEntity>) {
+    this.requests = response.list.map((friendship) => friendship.sender);
   }
 }

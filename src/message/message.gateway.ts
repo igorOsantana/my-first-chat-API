@@ -1,18 +1,30 @@
+import { Inject } from '@nestjs/common';
 import {
   OnGatewayConnection,
   SubscribeMessage,
   WebSocketGateway,
 } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
-import { AuthServices } from 'src/auth/auth.service';
+import {
+  AUTH_SERVICES,
+  TAuthServices,
+} from 'src/auth/interfaces/service.interface';
 import { ChatEntity } from 'src/chat/chat.entity';
 import { TEventCreateNewChatInput } from 'src/chat/chat.interface';
 import { ChatPresenter } from 'src/chat/chat.presenter';
-import { ChatUseCases } from 'src/chat/chat.usecase';
+import {
+  CHAT_USECASES,
+  TCreateChatUseCase,
+  TFindByIdChatUseCase,
+  TMarkAsReadChatUseCase,
+} from 'src/chat/interfaces/use-case.interface';
+import {
+  MESSAGE_USE_CASES,
+  TMessageUseCaseSend,
+} from './interfaces/use-case.interface';
 import { MessageEntity } from './message.entity';
 import { TEventSendNewMessageInput } from './message.interface';
 import { MessagePresenter } from './message.presenter';
-import { MessageUseCases } from './message.usecase';
 
 @WebSocketGateway(undefined, {
   transports: ['websocket'],
@@ -21,9 +33,16 @@ import { MessageUseCases } from './message.usecase';
 export class MessageWebSocketGateway implements OnGatewayConnection {
   private connectedClients: Map<string, Socket> = new Map();
   constructor(
-    private readonly authServices: AuthServices,
-    private readonly chatUseCases: ChatUseCases,
-    private readonly messageUseCases: MessageUseCases,
+    @Inject(AUTH_SERVICES)
+    private readonly authServices: TAuthServices,
+    @Inject(CHAT_USECASES.MARK_AS_READ)
+    private readonly markAsReadChatUseCase: TMarkAsReadChatUseCase,
+    @Inject(CHAT_USECASES.CREATE)
+    private readonly createChatUseCase: TCreateChatUseCase,
+    @Inject(CHAT_USECASES.FIND_BY_ID)
+    private readonly findByIdChatUseCase: TFindByIdChatUseCase,
+    @Inject(MESSAGE_USE_CASES.SEND)
+    private readonly messageUseCaseSend: TMessageUseCaseSend,
   ) {}
 
   async handleConnection(client: Socket) {
@@ -48,7 +67,7 @@ export class MessageWebSocketGateway implements OnGatewayConnection {
   @SubscribeMessage('markChatAsRead')
   async markChatAsRead(client: Socket, chatId: string) {
     const userId = await this.extractUserIdFromSocket(client);
-    await this.chatUseCases.markAsRead(chatId, userId);
+    await this.markAsReadChatUseCase.execute({ id: chatId, userId });
   }
 
   @SubscribeMessage('createNewChat')
@@ -56,7 +75,7 @@ export class MessageWebSocketGateway implements OnGatewayConnection {
     try {
       const reqUserId = await this.extractUserIdFromSocket(client);
 
-      const newChat = await this.chatUseCases.create({
+      const newChat = await this.createChatUseCase.execute({
         ...payload,
         senderId: reqUserId,
       });
@@ -92,11 +111,11 @@ export class MessageWebSocketGateway implements OnGatewayConnection {
     try {
       const userId = await this.extractUserIdFromSocket(client);
 
-      const chat = await this.chatUseCases.findById(payload.chatId);
+      const chat = await this.findByIdChatUseCase.execute(payload.chatId);
       chat.setDataByReqUserId(userId);
 
       const recipientClient = this.connectedClients.get(chat.recipient.id);
-      const newMessage = await this.messageUseCases.send({
+      const newMessage = await this.messageUseCaseSend.execute({
         ...payload,
         ownerId: userId,
       });
@@ -127,7 +146,7 @@ export class MessageWebSocketGateway implements OnGatewayConnection {
   ): Promise<string | null> {
     const token = socket.handshake.query.token;
     if (token && typeof token === 'string') {
-      const payload = await this.authServices.verifyToken(token);
+      const payload = this.authServices.verifyToken(token);
       return payload.sub;
     }
 
